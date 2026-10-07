@@ -15,3 +15,5 @@ server/backups/
 # scratch scripts
 _*.mjs
 server/_*.mjs
+.vercel
+.env*
