@@ -116,3 +116,7 @@ Left menu: **Dashboard**, **Stations** (All, Commissioned, In Progress, Pending/
 ## Out of scope so far
 
 Login and roles, Excel import/export, and zones other than the ones in the form's list.
+
+## Live site
+
+https://railtel.vercel.app (deployed from the main branch on Vercel; set MONGODB_URI and MONGODB_DB in Vercel > Settings > Environment Variables).
