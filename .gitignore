@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.log
+
+# Secrets: never commit these (they hold the MongoDB connection string / password).
+.env
+.env.*
+!.env.example
+
+# Local data backups and Vercel's local link folder
+server/backups/
+.vercel
+*.local
+
+# scratch scripts
+_*.mjs
+server/_*.mjs

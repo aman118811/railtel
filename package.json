@@ -1,0 +1,25 @@
+{
+  "name": "railtel-cctv",
+  "private": true,
+  "type": "module",
+  "description": "Project > Stations CCTV management. client/ = website, server/ = API, api/ = Vercel entry for the API, shared/ = rules used by both.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm --prefix server run dev",
+    "dev:web": "npm --prefix client run dev",
+    "check-db": "npm --prefix server run check-db",
+    "seed": "npm --prefix server run seed",
+    "test": "npm --prefix server test",
+    "build": "npm --prefix client run build"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^9.11.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
