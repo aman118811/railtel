@@ -19,7 +19,7 @@ export default function App() {
   const loc = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => { document.title = `${region} Railtel Project Management`; }, [region]);
+  useEffect(() => { document.title = "Railtel Project Management"; }, []);
   useEffect(() => { setMenu(false); }, [loc.pathname, loc.search]);
 
   const pickRegion = (r) => {
@@ -37,7 +37,6 @@ export default function App() {
           <img src={railtelLogo} alt="RailTel Logo" className="brand-logo" />
           <span className="brand-text">
             <span className="brand-main">Railtel Project Management</span>
-            <span className="brand-sub">VSS · Nirbhaya</span>
           </span>
         </Link>
       </header>

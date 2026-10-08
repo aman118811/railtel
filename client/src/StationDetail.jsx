@@ -10,10 +10,11 @@ import Breadcrumbs from './Breadcrumbs.jsx';
 import { compareQty, fmtDate, fmtDateTime, FLAG_LABEL, isCommissioned, lastListPath } from './format.js';
 
 const TABS = [
-  ['overview', 'Overview'], ['master', 'Station Master'], ['projects', 'Project Association'], ['scope', 'Approved Scope'], ['done', 'Work Done'],
+  ['master', 'Station Master'], ['projects', 'Project Association'], ['scope', 'Approved Scope'], ['done', 'Work Done'],
   ['phase1', 'Non-STQC Phase-I'], ['commissioning', 'Commissioning & Handover'], ['survey', 'Survey / Infrastructure'],
   ['bandwidth', 'Bandwidth'], ['history', 'Audit / Change History'],
 ];
+const MAIN_STAGES = LIFECYCLE.filter((s) => !['On Hold / Hindrance', 'Closed'].includes(s));
 const SECTION = Object.fromEntries(SECTIONS.map((s) => [s.id, s]));
 
 function show(def, v) {
@@ -28,7 +29,7 @@ function KV({ title, keys, d, hideEmpty = false }) {
   return (
     <section className="card">
       {title && <h3>{title}</h3>}
-      <dl className="kv">
+      <dl className="kv one">
         {defs.filter((f) => !hideEmpty || !isEmpty(d[f.key])).map((f) => (
           <div key={f.key}><dt>{f.label}<span className="col-tag" title="Excel column">{f.col}</span></dt><dd>{show(f, d[f.key])}</dd></div>
         ))}
@@ -170,7 +171,7 @@ function ProjectCards({ id }) {
 export default function StationDetail() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') || 'overview';
+  const tab = TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'master';
   const fromProject = params.get('project');
   const navigate = useNavigate();
   const { user, region } = useContext(UserContext);
@@ -209,6 +210,8 @@ export default function StationDetail() {
     ? [{ label: region }, { label: 'Projects', to: '/projects' }, { label: fromProjectName || 'Project', to: `/projects/${fromProject}?tab=stations` }, { label: rec.stn_code }]
     : [{ label: region }, { label: 'Stations', to: '/stations' }, { label: rec.stn_code }];
   const phase1On = d.has_phase1 === 'Y';
+  const stageIdx = MAIN_STAGES.indexOf(rec.lifecycle);
+  const hasHindrance = rec.lifecycle === 'On Hold / Hindrance' || ['hindrance_type', 'hindrance_available_date'].some((k) => !isEmpty(d[k]));
 
   return (
     <div className="page detail">
@@ -231,7 +234,7 @@ export default function StationDetail() {
         </div>
         <div className="dh-stats">
           <div><span>Project(s)</span><b>{projs.length ? projs.map((p, i) => <span key={p.project_id}>{i > 0 && ', '}<Link to={`/projects/${p.project_id}`}>{p.name}</Link></span>) : '—'}</b></div>
-          <div><span>Progress</span><b>{overall.pct}%</b></div>
+          <div><span>Data completeness</span><b>{overall.pct}%</b><span className="bar thin"><span className="bar-fill tone-blue" style={{ width: `${overall.pct}%` }} /></span></div>
           <div><span>Status</span><StatusPill status={rec.status} /></div>
           <div><span>Stage</span><LifecyclePill value={rec.lifecycle} draft={rec.draft} /></div>
           <div><span>Commissioned</span><b>{isCommissioned(rec.status) ? 'Yes' : 'No'}</b></div>
@@ -250,52 +253,6 @@ export default function StationDetail() {
           <div className="tab-edit"><Link to={editTo} className="btn btn-sm">Edit this section</Link></div>
         )}
         {tab === 'projects' && <ProjectCards id={rec.id} />}
-        {tab === 'overview' && (
-          <div className="dash-grid">
-            <section className="card">
-              <h3>Completeness</h3>
-              <div className="big-num">{overall.pct}% <small>{overall.filled} of {overall.total} fields filled</small></div>
-              <ul className="sec-list">
-                {SECTIONS.map((s) => { const p = sectionProgress(s, d); return (
-                  <li key={s.id}><span>{s.number}. {s.title}</span><b>{p.na ? 'N/A' : `${p.filled}/${p.total}`}</b></li>
-                ); })}
-              </ul>
-            </section>
-            <section className="card">
-              <h3>Approved vs work done</h3>
-              <div className="big-num">{d.done_total ?? 0} <small>of {d.scope_total ?? 0} cameras</small></div>
-              {cam.pct !== null && <div className="bar"><div className={`bar-fill tone-${cam.flag === 'shortfall' ? 'red' : cam.flag === 'over' ? 'amber' : 'green'}`} style={{ width: `${cam.pct}%` }} /></div>}
-              <p><span className={`flag flag-${cam.flag}`}>{FLAG_LABEL[cam.flag]}</span> {cam.variance !== null && cam.variance !== 0 && <span className="muted">variance {cam.variance > 0 ? '+' : ''}{cam.variance}</span>}</p>
-              <button type="button" className="link-btn" onClick={() => setTab('done')}>See full comparison →</button>
-            </section>
-            <section className="card">
-              <h3>Stage</h3>
-              <p className="muted small">The application's own stage. The sheet's Status ({rec.status || '—'}) is kept unchanged.</p>
-              <div className="stage-row">
-                <select value={stage} onChange={(e) => setStage(e.target.value)} aria-label="Stage">
-                  <option value="">—</option>{LIFECYCLE.map((s) => <option key={s}>{s}</option>)}
-                </select>
-                <button type="button" className="btn" disabled={stage === (rec.lifecycle || '') || !stage} onClick={saveStage}>Save stage</button>
-              </div>
-              {msg && <p className="muted small" role="status">{msg}</p>}
-            </section>
-            <KV title="Commissioning" keys={['status', 'scheme', 'target_commission_date', 'install_month', 'install_year']} d={d} />
-            <KV title="Handover" keys={['handed_over', 'handover_date', 'handover_target']} d={d} />
-            <KV title="Hindrance" keys={['hindrance_type', 'hindrance_available_date', 'remarks']} d={d} />
-            <section className="card span2">
-              <h3>Record</h3>
-              <dl className="kv">
-                <div><dt>Origin</dt><dd>{rec.origin === 'excel_import' ? 'Imported from Excel' : 'Created in the application'}</dd></div>
-                <div><dt>Created by</dt><dd>{rec.created_by || '—'}</dd></div>
-                <div><dt>Created</dt><dd>{fmtDateTime(rec.created_at)}</dd></div>
-                <div><dt>Last updated by</dt><dd>{rec.updated_by || '—'}</dd></div>
-                <div><dt>Last updated</dt><dd>{fmtDateTime(rec.updated_at)}</dd></div>
-                <div><dt>S.N.</dt><dd>{rec.sn}{d.src_sn && String(d.src_sn) !== String(rec.sn) ? ` (Excel: ${d.src_sn})` : ''}</dd></div>
-              </dl>
-            </section>
-          </div>
-        )}
-
         {tab === 'master' && (
           <div className="dash-grid">
             <KV title="Station identity" keys={['sn', 'stn_code', 'station_name', 'new_beyond_scope']} d={d} />

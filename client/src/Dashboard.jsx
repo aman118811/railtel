@@ -1,8 +1,7 @@
-import { useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from './api.js';
-import { UserContext } from './App.jsx';
 import { LifecyclePill } from './StatusPill.jsx';
 import { fmtDate, fmtDateTime } from './format.js';
 
@@ -101,7 +100,6 @@ function attention(p) {
 }
 
 export default function Dashboard() {
-  const { region } = useContext(UserContext);
   const navigate = useNavigate();
   const [d, setD] = useState(null);
   const [projects, setProjects] = useState(null);
@@ -153,7 +151,7 @@ export default function Dashboard() {
         <div>
           <h1>Project Dashboard</h1>
           <p className="sheet-title">
-            {region} Region · {projects.length} project{projects.length === 1 ? '' : 's'} · {nf(t.stations)} stations
+            {projects.length} project{projects.length === 1 ? '' : 's'} · {nf(t.stations)} stations
             {t.drafts > 0 && <> · <Link to="/stations?view=drafts">{t.drafts} draft{t.drafts > 1 ? 's' : ''}</Link></>}
           </p>
         </div>
