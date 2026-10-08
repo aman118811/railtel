@@ -46,6 +46,7 @@ export const api = {
   page: (params = {}) => request('GET', `/stations?${query({ ...params, page: params.page || 1 })}`),
   dashboard: () => request('GET', `/dashboard?${query({})}`),
   facets: () => request('GET', `/facets?${query({})}`),
+  lookups: (region) => request('GET', `/lookups?${query(region ? { region } : {})}`),
   exportUrl: (params = {}) => `${BASE}/export?${query(params)}`,
   // extra: { draft, lifecycle }
   create: (data, user, extra = {}) => request('POST', '/stations', { data, user, region: getRegion(), ...extra }),

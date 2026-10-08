@@ -2,14 +2,19 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from './Breadcrumbs.jsx';
 import {
-  REGIONS, SECTIONS, FIELDS, FIELD_BY_KEY, applyComputed, defaultsFor, isEmpty, isVisible, overallProgress, sameValue, validate,
+  REGIONS, SECTIONS, FIELDS, FIELD_BY_KEY, ZONE_DIVISIONS, applyComputed, defaultsFor, isEmpty, isVisible, overallProgress, sameValue, validate,
 } from '@shared/fields.js';
-import { lookupStation } from '@shared/stationsMaster.js';
+import { lookupStation, STATIONS_MASTER } from '@shared/stationsMaster.js';
 import { api } from './api.js';
 import { UserContext, REGION_NAMES } from './App.jsx';
 import Field from './Field.jsx';
 import CompareSection from './CompareSection.jsx';
 import { fmtDate, lastListPath } from './format.js';
+
+const MASTER_NAMES = STATIONS_MASTER.map((m) => m.name);
+const MASTER_BY_NAME = Object.fromEntries(STATIONS_MASTER.map((m) => [m.name.toLowerCase(), m]));
+const zoneOfDivision = (div) => Object.keys(ZONE_DIVISIONS).find((z) => ZONE_DIVISIONS[z].includes(div)) || null;
+const low = (v) => String(v ?? '').trim().toLowerCase();
 
 const SEC = Object.fromEntries(SECTIONS.map((s) => [s.id, s]));
 const EDITABLE = FIELDS.filter((f) => f.type !== 'auto' && !f.hidden);
@@ -120,13 +125,59 @@ export default function StationWizard() {
   const view = useMemo(() => applyComputed(data), [data]);
   const strict = useMemo(() => validate(view, { strict: true }), [view]);
   const overall = overallProgress(view).pct;
-  const onChange = (key, value) => setData((d) => ({ ...d, [key]: value }));
+  // Hints learned from the region's existing stations (thanas, codes in use, the standard scope package).
+  const [lookups, setLookups] = useState(null);
+  useEffect(() => { if (stage === 'form') api.lookups(stationRegion).then(setLookups).catch(() => {}); }, [stage, stationRegion]);
+  // "Work done / proposed under" is the chosen project's own sheet text, so fill it once when the form opens.
+  useEffect(() => {
+    const src = projects.find((p) => p.id === projectId)?.source_values?.[0];
+    if (stage === 'form' && !draftId && src) setData((d) => (isEmpty(d.scheme) ? { ...d, scheme: src } : d));
+  }, [stage, projectId, projects, draftId]);
+  const thanaByName = useMemo(() => new Map((lookups?.thanas || []).map((t) => [low(t.name), t])), [lookups]);
+  const thanaNames = useMemo(() => (lookups?.thanas || []).map((t) => t.name), [lookups]);
+
+  // Picking a value fills what follows from it, but only fields that are still empty (the thana code always follows its thana).
+  const onChange = (key, value) => setData((d) => {
+    const next = { ...d, [key]: value };
+    if (key === 'division' && value && isEmpty(d.zone)) next.zone = zoneOfDivision(value) || d.zone;
+    if (key === 'server_thana') {
+      const t = thanaByName.get(low(value));
+      if (t) {
+        next.server_thana = t.name;
+        if (t.code) next.server_thana_code = t.code;
+        if (isEmpty(d.division) && t.division) next.division = t.division;
+        if (isEmpty(d.zone) && t.zone) next.zone = t.zone;
+        if (isEmpty(d.state) && t.state) next.state = t.state;
+      }
+    }
+    if (key === 'station_name') {
+      const m = MASTER_BY_NAME[low(value)];
+      if (m && isEmpty(d.stn_code)) {
+        Object.assign(next, {
+          station_name: m.name, stn_code: m.code, zone: m.zone, division: m.division, state: m.state,
+          server_thana: m.thana, server_thana_code: m.thanaCode, ...(m.cat ? { old_category: m.cat } : {}),
+        });
+      }
+    }
+    return next;
+  });
 
   const cur = STEPS[step];
   const stepKeys = new Set([...cur.fields.map((f) => f.key), ...(cur.compare || []).flatMap((c) => c.fields.map((f) => f.key))]);
   // Within a step only show problems once the user has tried to move on (and always for the review).
   const stepErrors = (attempted || step === STEPS.length - 1) ? Object.fromEntries(Object.entries(strict.errors).filter(([k]) => stepKeys.has(k) || cur.id === 'review')) : {};
   const stepWarnings = Object.fromEntries(Object.entries(strict.warnings).filter(([k]) => stepKeys.has(k)));
+  if (cur.id === 'master' && !record && view.stn_code && view.zone && lookups?.codes.includes(view.zone + ':' + view.stn_code)) {
+    stepWarnings.stn_code = 'A station with code ' + view.stn_code + ' already exists in ' + view.zone + '.';
+  }
+  // Suggestions for the name and thana fields (the field definitions themselves are unchanged).
+  const withSuggestions = (f) => {
+    if (f.key === 'station_name') return { ...f, type: 'select', allowTyping: true, options: MASTER_NAMES };
+    if (['server_thana', 'monitoring_thana'].includes(f.key) && thanaNames.length) return { ...f, type: 'select', allowTyping: true, options: thanaNames };
+    return f;
+  };
+  const scopeEmpty = ['scope_dome', 'scope_fixed', 'scope_ptz', 'scope_k4', 'scope_yard', 'scope_panic', 'scope_va', 'scope_frs'].every((k) => isEmpty(view[k]));
+  const pkg = lookups?.standard_scope;
 
   const identityOk = !isEmpty(view.stn_code) && !isEmpty(view.station_name) && !isEmpty(view.zone);
   // Hard (non-"Required") problems that block even a draft: negative numbers, whole-number rules.
@@ -184,10 +235,10 @@ export default function StationWizard() {
   };
 
   const masterMatch = step === 0 && !record && view.stn_code ? lookupStation(view.stn_code) : null;
-  const applyMaster = (m) => {
-    onChange('station_name', m.name); onChange('zone', m.zone); onChange('division', m.division); onChange('state', m.state);
-    onChange('server_thana', m.thana); onChange('server_thana_code', m.thanaCode); if (m.cat) onChange('old_category', m.cat);
-  };
+  const applyMaster = (m) => setData((d) => ({
+    ...d, station_name: m.name, zone: m.zone, division: m.division, state: m.state, server_thana: m.thana, server_thana_code: m.thanaCode,
+    ...(m.cat ? { old_category: m.cat } : {}),
+  }));
 
   if (loading) return <div className="page"><p className="muted">Loading…</p></div>;
 
@@ -279,6 +330,17 @@ export default function StationWizard() {
             <button type="button" className="btn btn-sm btn-primary" onClick={() => applyMaster(masterMatch)}>Auto-fill station details</button>
           </div>
         )}
+        {cur.id === 'scope' && pkg && scopeEmpty && (
+          <div className="form-quick-banner">
+            <button type="button" className="btn btn-sm btn-accent" onClick={() => Object.entries(pkg.values).forEach(([k, v]) => onChange(k, v))}>
+              Fill the standard package
+            </button>
+            <span className="muted">
+              {pkg.values.scope_total} cameras ({pkg.values.scope_fixed ?? 0} fixed, {pkg.values.scope_ptz ?? 0} PTZ) · {pkg.values.scope_panic ?? 0} panic buttons · {pkg.values.scope_va ?? 0} VA
+              {' '}— used by {pkg.count} of {pkg.of} stations. Change anything that differs.
+            </span>
+          </div>
+        )}
         {cur.id === 'done' && (
           <div className="form-quick-banner">
             <button type="button" className="btn btn-sm btn-accent" onClick={() => {
@@ -293,7 +355,7 @@ export default function StationWizard() {
             {cur.id === 'phase1' && (
               <p className="muted">Fill this in only if the station has existing Non-STQC (Phase-1) cameras. If it has none, leave everything blank.</p>
             )}
-            <Fields fields={cur.fields} data={view} onChange={onChange} errors={stepErrors} warnings={stepWarnings} />
+            <Fields fields={cur.id === 'master' ? cur.fields.map(withSuggestions) : cur.fields} data={view} onChange={onChange} errors={stepErrors} warnings={stepWarnings} />
             {(cur.compare || []).map((sec) => (
               <details key={sec.id} className="fold" open={cur.compare.length === 1 || sec.id === 'indoor'}>
                 <summary><b>{sec.title}</b>{sec.subtitle && <span className="muted"> {sec.subtitle}</span>}</summary>

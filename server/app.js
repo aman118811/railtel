@@ -463,6 +463,41 @@ export function createApp() {
     res.json({ regions: REGIONS, zones, divisions, statuses, lifecycles: LIFECYCLE, states });
   }));
 
+  // Hints for the create-station form, learned from the region's existing stations: thanas (with their code,
+  // division, zone and state), the codes already in use, and the most common approved-scope package.
+  // Kept for a minute so a burst of forms does not recount the region.
+  const lookupCache = new Map();
+  app.get('/api/lookups', wrap(async (req, res) => {
+    const region = String(req.query.region || DEFAULT_REGION);
+    const hit = lookupCache.get(region);
+    if (hit && Date.now() - hit.at < 60 * 1000) return res.json(hit.body);
+    const SCOPE = ['scope_total', 'scope_dome', 'scope_fixed', 'scope_ptz', 'scope_k4', 'scope_yard', 'scope_panic', 'scope_va', 'scope_frs'];
+    const proj = { stn_code: 1, zone: 1, division: 1, 'data.server_thana': 1, 'data.server_thana_code': 1, 'data.state': 1 };
+    for (const k of SCOPE) proj[`data.${k}`] = 1;
+    const rows = await Station.find({ region, draft: { $ne: true } }, proj).lean();
+    const mode = (arr) => { const m = new Map(); for (const v of arr) if (v) m.set(v, (m.get(v) || 0) + 1); return [...m].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null; };
+    const byThana = new Map();
+    const pkgs = new Map();
+    for (const r of rows) {
+      const name = r.data?.server_thana?.trim();
+      if (name) (byThana.get(name) || byThana.set(name, []).get(name)).push(r);
+      const sig = JSON.stringify(SCOPE.map((k) => r.data?.[k] ?? null));
+      pkgs.set(sig, (pkgs.get(sig) || 0) + 1);
+    }
+    const thanas = [...byThana].map(([name, list]) => ({
+      name, code: mode(list.map((r) => r.data.server_thana_code)), division: mode(list.map((r) => r.division)),
+      zone: mode(list.map((r) => r.zone)), state: mode(list.map((r) => r.data.state)),
+    })).sort((a, b) => a.name.localeCompare(b.name));
+    const [sig, count] = [...pkgs].sort((a, b) => b[1] - a[1])[0] || [null, 0];
+    const body = {
+      thanas,
+      codes: rows.map((r) => `${r.zone}:${r.stn_code}`),
+      standard_scope: sig ? { count, of: rows.length, values: Object.fromEntries(SCOPE.map((k, i) => [k, JSON.parse(sig)[i]]).filter(([, v]) => v !== null)) } : null,
+    };
+    lookupCache.set(region, { at: Date.now(), body });
+    res.json(body);
+  }));
+
   app.get('/api/stations/:id', wrap(async (req, res) => {
     const doc = await Station.findById(parseId(req)).lean();
     if (!doc) throw new HttpError(404, { error: 'Station not found' });

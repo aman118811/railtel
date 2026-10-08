@@ -24,9 +24,13 @@ export const OPTIONS = {
   ZONE: ['NR', 'NCR', 'NER', 'NWR'],
   DIVISION_NR: ['DLI', 'FZR', 'LKO', 'MB', 'UMB'],
   DIVISIONS: ALL_DIVISIONS,
+  // All Indian states and union territories (spelled as the sheet spells them), so any region can pick its own.
   STATE: [
-    'Delhi', 'Haryana', 'Himachal Pradesh', 'Jammu & Kashmir', 'Punjab', 'Uttar Pradesh',
-    'Uttarakhand', 'Rajasthan', 'Madhya Pradesh', 'Bihar', 'Chandigarh',
+    'Andaman & Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chandigarh', 'Chhattisgarh',
+    'Dadra & Nagar Haveli and Daman & Diu', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu & Kashmir',
+    'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
+    'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+    'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
   ],
   OLD_CATEGORY: ['A-1', 'A', 'B', 'C', 'D', 'E', 'F'],
   NEW_CATEGORY: ['NSG-1', 'NSG-2', 'NSG-3', 'NSG-4', 'NSG-5', 'NSG-6', 'SG-1', 'SG-2', 'SG-3', 'HG-1', 'HG-2', 'HG-3'],
