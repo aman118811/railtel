@@ -255,4 +255,5 @@ ul.plain { margin: 0; padding-left: 18px; }
 .attn-list a { color: #0f172a; text-decoration: none; }
 .attn-list span { color: #b45309; font-size: 12.5px; }
 @media (max-width: 1300px) { .dash .tiles.six { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .dash .tiles.six { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .dash .tiles.six { grid-template-columns: repeat(2, minmax(0, 1fr)); } }.recharts-tooltip-wrapper { z-index: 50; }
+.donut-center { z-index: 0; }

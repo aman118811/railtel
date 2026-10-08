@@ -22,7 +22,7 @@ function Tip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="chart-tip">
-      {(label ?? payload[0].payload?.name) && <div className="chart-tip-h">{label ?? payload[0].payload.name}</div>}
+      {label != null && label !== "" && <div className="chart-tip-h">{label}</div>}
       {payload.map((p) => (
         <div key={p.dataKey || p.name} className="chart-tip-r">
           <i style={{ background: p.color || p.payload?.fill }} />
