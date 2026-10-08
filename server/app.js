@@ -5,7 +5,7 @@ import {
   pickKnown, applyComputed, validate, overallProgress, sameValue, deriveLifecycle, LIFECYCLE, FIELDS, REGIONS, DEFAULT_REGION,
 } from '../shared/fields.js';
 import {
-  Station, StationHistory, Counter, Project, ProjectStation, ProjectHistory, PROJECT_TYPES, PROJECT_STATUSES,
+  Station, StationHistory, Counter, Project, ProjectStation, ProjectHistory, PROJECT_STATUSES,
 } from './models/index.js';
 
 // ---------------------------------------------------------------- helpers
@@ -45,13 +45,13 @@ const toSummary = (d) => {
 };
 
 // ---- projects
-const PROJECT_FIELDS = ['code', 'name', 'type', 'description', 'executing_agency', 'scope_description', 'status',
+const PROJECT_FIELDS = ['code', 'name', 'description', 'executing_agency', 'scope_description', 'status',
   'start_date', 'target_completion_date', 'approved_station_count', 'approved_camera_scope', 'remarks'];
 const IN_PROGRESS = ['New', 'Survey Pending', 'Survey Completed', 'Work In Progress', 'Offered'];
 const isoDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
 
 const projectToApi = (p, stats) => ({
-  id: String(p._id), region: p.region, code: p.code ?? null, name: p.name, type: p.type, description: p.description ?? null,
+  id: String(p._id), region: p.region, code: p.code ?? null, name: p.name, description: p.description ?? null,
   executing_agency: p.executing_agency ?? null, scope_description: p.scope_description ?? null, status: p.status,
   start_date: p.start_date ?? null, target_completion_date: p.target_completion_date ?? null,
   approved_station_count: p.approved_station_count ?? null, approved_camera_scope: p.approved_camera_scope ?? null,
@@ -125,7 +125,6 @@ function cleanProject(body = {}) {
 function validateProject(p, { partial = false } = {}) {
   const errors = {};
   if (!partial || 'name' in p) { if (!p.name) errors.name = 'Required'; }
-  if (p.type && !PROJECT_TYPES.includes(p.type)) errors.type = 'Choose a project type';
   if (p.status && !PROJECT_STATUSES.includes(p.status)) errors.status = 'Choose a status';
   for (const k of ['start_date', 'target_completion_date']) if (p[k] && !isoDate(p[k])) errors[k] = 'Enter a valid date';
   for (const k of ['approved_station_count', 'approved_camera_scope']) if (p[k] !== null && p[k] !== undefined && (!Number.isInteger(p[k]) || p[k] < 0)) errors[k] = 'Must be a whole number, 0 or more';
@@ -320,19 +319,18 @@ export function createApp() {
   const dupProject = () => new HttpError(409, { error: 'A project with this name or code already exists', code: 'duplicate' });
 
   app.get('/api/projects', wrap(async (req, res) => {
-    const { region, q, type, status, agency, sort, dir } = req.query;
+    const { region, q, status, agency, sort, dir } = req.query;
     const filter = {};
     if (region && region !== 'all') filter.region = String(region);
-    if (type) filter.type = String(type);
     if (status) filter.status = String(status);
     if (agency) filter.executing_agency = new RegExp(escapeRegex(String(agency)), 'i');
-    if (q) { const rx = new RegExp(escapeRegex(String(q)), 'i'); filter.$or = [{ name: rx }, { code: rx }, { type: rx }, { executing_agency: rx }]; }
+    if (q) { const rx = new RegExp(escapeRegex(String(q)), 'i'); filter.$or = [{ name: rx }, { code: rx }, { executing_agency: rx }]; }
     const docs = await Project.find(filter).lean();
     const light = req.query.stats === '0'; // names only (pickers); skips the station counting
     const stats = light ? {} : await statsByProject(docs.map((d) => d._id));
     let rows = docs.map((d) => projectToApi(d, light ? null : stats[String(d._id)]));
     if (light) return res.json(rows.sort((a, b) => a.name.localeCompare(b.name)));
-    const key = { name: (r) => r.name.toLowerCase(), type: (r) => r.type, status: (r) => r.status, stations: (r) => r.stats.total,
+    const key = { name: (r) => r.name.toLowerCase(), status: (r) => r.status, stations: (r) => r.stats.total,
       commissioned: (r) => r.stats.commissioned, progress: (r) => r.stats.progress, hindrance: (r) => r.stats.hindrance }[sort] || ((r) => r.name.toLowerCase());
     const sign = dir === 'desc' ? -1 : 1;
     rows = rows.sort((a, b) => (key(a) > key(b) ? sign : key(a) < key(b) ? -sign : 0));
@@ -435,7 +433,7 @@ export function createApp() {
     const byId = new Map(projects.map((p) => [String(p._id), p]));
     res.json(links.filter((l) => byId.has(String(l.project))).map((l) => {
       const p = byId.get(String(l.project));
-      return { project_id: String(p._id), name: p.name, type: p.type, status: p.status, executing_agency: p.executing_agency ?? null,
+      return { project_id: String(p._id), name: p.name, status: p.status, executing_agency: p.executing_agency ?? null,
         relationship_type: l.relationship_type, source_project_value: l.source_project_value ?? null, linked_at: l.linked_at.toISOString(), linked_by: l.linked_by };
     }));
   }));

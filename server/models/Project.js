@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
 
-export const PROJECT_TYPES = ['VSS', 'Nirbhaya', 'Combined / Multi-Project', 'Other'];
 export const PROJECT_STATUSES = ['Planned', 'Active', 'On Hold', 'Completed', 'Closed'];
 
 /** A project is a first-class record. Stations are linked to it through ProjectStation (never copied). */
@@ -11,7 +10,6 @@ const projectSchema = new Schema(
     region: { type: String, enum: ['ER', 'NR', 'SR', 'WR'], default: 'NR' },
     code: { type: String, default: null, trim: true, uppercase: true, maxlength: 30 },
     name: { type: String, required: true, trim: true, maxlength: 160 },
-    type: { type: String, enum: PROJECT_TYPES, default: 'Other' },
     description: { type: String, default: null, trim: true, maxlength: 1000 },
     executing_agency: { type: String, default: null, trim: true, maxlength: 160 },
     scope_description: { type: String, default: null, trim: true, maxlength: 1000 },

@@ -206,7 +206,7 @@ export default function StationWizard() {
             <div className="choice-grid" role="radiogroup" aria-label="Project">
               {projects.map((p) => (
                 <button key={p.id} type="button" role="radio" aria-checked={projectId === p.id} className={`choice ${projectId === p.id ? 'on' : ''}`} onClick={() => setProjectId(p.id)}>
-                  <b>{p.name}</b><span className="muted">{p.type} · {p.region}</span>
+                  <b>{p.name}</b><span className="muted">{p.region} region</span>
                 </button>
               ))}
               <button type="button" role="radio" aria-checked={projectId === ''} className={`choice ${projectId === '' ? 'on' : ''}`} onClick={() => setProjectId('')}>

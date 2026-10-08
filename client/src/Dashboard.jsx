@@ -178,14 +178,13 @@ export default function Dashboard() {
         <div className="table-wrap">
           <table className="portfolio">
             <thead>
-              <tr><th>Project</th><th>Type</th><th>Status</th><th className="pnum">Stations</th><th className="pnum">Commissioned</th>
+              <tr><th>Project</th><th>Status</th><th className="pnum">Stations</th><th className="pnum">Commissioned</th>
                 <th className="pnum">In progress</th><th className="pnum">Hindrance</th><th className="prog-col">Progress</th><th>Target</th></tr>
             </thead>
             <tbody>
               {projects.map((p) => (
                 <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} className="clickable">
                   <td><Link to={`/projects/${p.id}`} onClick={(e) => e.stopPropagation()}><b>{p.name}</b></Link></td>
-                  <td>{p.type}</td>
                   <td><span className="chip-dot" style={{ background: PROJECT_STATUS_COLOR[p.status] }} />{p.status}</td>
                   <td className="pnum">{nf(p.stats.total)}</td>
                   <td className="pnum">{nf(p.stats.commissioned)}</td>
@@ -197,7 +196,7 @@ export default function Dashboard() {
                   <td>{p.target_completion_date ? fmtDate(p.target_completion_date) : '—'}</td>
                 </tr>
               ))}
-              {projects.length === 0 && <tr><td colSpan="9" className="muted pad">No projects in this region yet.</td></tr>}
+              {projects.length === 0 && <tr><td colSpan="8" className="muted pad">No projects in this region yet.</td></tr>}
             </tbody>
           </table>
         </div>

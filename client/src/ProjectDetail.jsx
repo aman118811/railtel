@@ -204,14 +204,13 @@ export default function ProjectDetail() {
       <Breadcrumbs items={[{ label: region }, { label: 'Projects', to: '/projects' }, { label: p.name }]} />
       <header className="detail-head card">
         <div className="dh-top">
-          <div className="dh-title"><h1>{p.name}</h1><p className="muted">{p.type}{p.code ? ` · ${p.code}` : ''}{p.executing_agency ? ` · ${p.executing_agency}` : ''}</p></div>
+          <div className="dh-title"><h1>{p.name}</h1></div>
           <div className="dh-actions"><button type="button" className="btn" onClick={() => navigate('/projects')}>← All projects</button><Link to={`/projects/${p.id}/edit`} className="btn btn-primary">Edit</Link></div>
         </div>
         <div className="dh-stats">
           <div><span>Status</span><ProjectStatus status={p.status} /></div>
           <div><span>Progress</span><b>{st.progress}%</b></div>
           <div><span>Stations</span><b>{st.total}</b></div>
-          <div><span>Start</span><b>{fmtDate(p.start_date)}</b></div>
           <div><span>Target completion</span><b>{fmtDate(p.target_completion_date)}</b></div>
         </div>
       </header>

@@ -31,7 +31,7 @@ after(async () => {
 const station = { stn_code: 'del1', station_name: 'Delete Me', zone: 'NR', division: 'DLI', state: 'Delhi', status: 'Not Live' };
 
 test('delete station: archived copy, links removed, project history, code reusable', async () => {
-  const p = await call('POST', '/projects', { data: { name: 'Del Proj', type: 'Other' } });
+  const p = await call('POST', '/projects', { data: { name: 'Del Proj' } });
   const s = await call('POST', '/stations', { data: station, project_id: p.body.id });
   assert.equal(s.status, 201);
   assert.equal((await call('DELETE', `/stations/${s.body.id}?user=amy`)).status, 200);

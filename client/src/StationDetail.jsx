@@ -156,8 +156,7 @@ function ProjectCards({ id }) {
         <section className="card" key={p.project_id}>
           <h3><Link to={`/projects/${p.project_id}`}>{p.name}</Link></h3>
           <dl className="kv">
-            <div><dt>Type</dt><dd>{p.type}</dd></div><div><dt>Project status</dt><dd>{p.status}</dd></div>
-            <div><dt>Executing agency</dt><dd>{p.executing_agency || <span className="not-set">Not set</span>}</dd></div>
+            <div><dt>Project status</dt><dd>{p.status}</dd></div>
             <div><dt>Relationship</dt><dd>{p.relationship_type}</dd></div>
             <div><dt>Original Excel value</dt><dd>{p.source_project_value || <span className="not-set">Linked in the app</span>}</dd></div>
             <div><dt>Linked</dt><dd>{fmtDateTime(p.linked_at)} by {p.linked_by}</dd></div>

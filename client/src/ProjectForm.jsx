@@ -3,34 +3,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from './api.js';
 import { UserContext } from './App.jsx';
 import Breadcrumbs from './Breadcrumbs.jsx';
-import { PROJECT_STATUSES, PROJECT_TYPES } from './Projects.jsx';
+import { PROJECT_STATUSES } from './Projects.jsx';
 
-const EMPTY = {
-  name: '', code: '', description: '', type: '', executing_agency: '', scope_description: '', approved_station_count: '',
-  approved_camera_scope: '', start_date: '', target_completion_date: '', status: 'Active', remarks: '',
-};
+const EMPTY = { name: '', target_completion_date: '', status: 'Active' };
 const STEPS = [
-  { id: 'identity', title: 'Project Identity', keys: ['name', 'code', 'description'] },
-  { id: 'class', title: 'Project Classification', keys: ['type'] },
-  { id: 'agency', title: 'Executing Agency & Scope', keys: ['executing_agency', 'scope_description', 'approved_station_count', 'approved_camera_scope'] },
-  { id: 'dates', title: 'Targets & Dates', keys: ['start_date', 'target_completion_date', 'status', 'remarks'] },
+  { id: 'identity', title: 'Project Details', keys: ['name', 'status', 'target_completion_date'] },
   { id: 'review', title: 'Review', keys: [] },
 ];
-const LABEL = {
-  name: 'Project name', code: 'Project code / reference', description: 'Description', type: 'Project type',
-  executing_agency: 'Executing agency', scope_description: 'Scope description', approved_station_count: 'Approved station count',
-  approved_camera_scope: 'Approved camera scope (total cameras)', start_date: 'Project start date',
-  target_completion_date: 'Target completion date', status: 'Current status', remarks: 'Remarks',
-};
+const LABEL = { name: 'Project name', status: 'Current status', target_completion_date: 'Target completion date' };
 
 function validate(d) {
   const e = {};
   if (!d.name.trim()) e.name = 'Required';
-  if (!d.type) e.type = 'Choose a project type';
-  for (const k of ['approved_station_count', 'approved_camera_scope']) {
-    if (d[k] !== '' && !/^\d+$/.test(String(d[k]))) e[k] = 'Must be a whole number, 0 or more';
-  }
-  if (d.start_date && d.target_completion_date && d.target_completion_date < d.start_date) e.target_completion_date = 'Cannot be before the start date';
   return e;
 }
 
@@ -38,15 +22,12 @@ function Input({ k, d, set, err }) {
   const id = `p-${k}`;
   const common = { id, value: d[k] ?? '', onChange: (e) => set(k, e.target.value), 'aria-invalid': err ? true : undefined };
   let el;
-  if (k === 'type') el = <select {...common}><option value="">Select…</option>{PROJECT_TYPES.map((t) => <option key={t}>{t}</option>)}</select>;
-  else if (k === 'status') el = <select {...common}>{PROJECT_STATUSES.map((t) => <option key={t}>{t}</option>)}</select>;
-  else if (['description', 'scope_description', 'remarks'].includes(k)) el = <textarea rows={3} {...common} />;
+  if (k === 'status') el = <select {...common}>{PROJECT_STATUSES.map((t) => <option key={t}>{t}</option>)}</select>;
   else if (k.endsWith('_date')) el = <input type="date" {...common} />;
-  else if (k.startsWith('approved')) el = <input type="number" min="0" step="1" {...common} />;
   else el = <input type="text" {...common} />;
   return (
-    <div className={`field ${['description', 'scope_description', 'remarks'].includes(k) ? 'full' : ''} ${err ? 'has-error' : ''}`}>
-      <label htmlFor={id} className="field-label"><span>{LABEL[k]}{k === 'name' || k === 'type' ? <b className="req"> *</b> : null}</span></label>
+    <div className={`field ${err ? 'has-error' : ''}`}>
+      <label htmlFor={id} className="field-label"><span>{LABEL[k]}{k === 'name' ? <b className="req"> *</b> : null}</span></label>
       {el}
       {err && <div className="msg msg-error" role="alert">{err}</div>}
     </div>

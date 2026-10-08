@@ -179,11 +179,11 @@ test('regions: stations default to NR, can be created in another region, and eve
 });
 
 test('projects: create, validate, link without duplicating, create-from-project, unlink, history, stats', async () => {
-  const bad = await call('POST', '/projects', { data: { name: '', type: 'VSS' } });
+  const bad = await call('POST', '/projects', { data: { name: '' } });
   assert.equal(bad.status, 422);
-  const p = await call('POST', '/projects', { user: 'amy', data: { name: 'Proj A', type: 'VSS', executing_agency: 'RailTel', start_date: '2026-01-01', target_completion_date: '2026-12-31' } });
+  const p = await call('POST', '/projects', { user: 'amy', data: { name: 'Proj A', executing_agency: 'RailTel', start_date: '2026-01-01', target_completion_date: '2026-12-31' } });
   assert.equal(p.status, 201);
-  assert.equal((await call('POST', '/projects', { data: { name: 'Proj A', type: 'VSS' } })).status, 409);
+  assert.equal((await call('POST', '/projects', { data: { name: 'Proj A' } })).status, 409);
   assert.equal((await call('POST', '/projects', { data: { name: 'Proj Bad', start_date: '2026-05-01', target_completion_date: '2026-01-01' } })).status, 422);
 
   const before = (await call('GET', '/stations?page=1')).body.total;
@@ -192,7 +192,7 @@ test('projects: create, validate, link without duplicating, create-from-project,
   const list = await call('GET', `/stations?project=${p.body.id}&page=1`);
   assert.deepEqual(list.body.items.map((s) => s.stn_code), ['PRJ1']);
 
-  const other = await call('POST', '/projects', { data: { name: 'Proj B', type: 'Nirbhaya' } });
+  const other = await call('POST', '/projects', { data: { name: 'Proj B' } });
   const link = await call('POST', `/projects/${other.body.id}/stations`, { station_id: s1.body.id, user: 'amy' });
   assert.equal(link.status, 201);
   assert.equal((await call('POST', `/projects/${other.body.id}/stations`, { station_id: s1.body.id })).status, 409);
@@ -213,6 +213,6 @@ test('projects: create, validate, link without duplicating, create-from-project,
   assert.deepEqual(h.body.map((x) => x.action), ['unlink', 'link', 'create']);
   const none = await call('GET', '/stations?project=none&page=1');
   assert.ok(none.body.items.every((s) => s.stn_code !== 'PRJ1'));
-  const lst = await call('GET', '/projects?type=VSS');
+  const lst = await call('GET', '/projects');
   assert.ok(lst.body.some((x) => x.name === 'Proj A' && x.stats.total === 1));
 });
