@@ -7,15 +7,6 @@ export const UserContext = createContext({ user: 'Operator', region: 'NR', focus
 
 export const REGION_NAMES = { ER: 'Eastern', NR: 'Northern', SR: 'Southern', WR: 'Western' };
 
-// Sidebar structure (spec section 3). `view` items share /stations and differ by ?view=.
-const STATION_VIEWS = [
-  { label: 'Commissioned', view: 'commissioned' },
-  { label: 'In Progress', view: 'in_progress' },
-  { label: 'Pending / Hindrance', view: 'hindrance' },
-  { label: 'Handover Pending', view: 'handover_pending' },
-  { label: 'Drafts', view: 'drafts' },
-];
-
 function SideLink({ to, children, end = true }) {
   return <NavLink to={to} end={end} className={({ isActive }) => (isActive ? 'side-link on' : 'side-link')}>{children}</NavLink>;
 }
@@ -27,7 +18,6 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const loc = useLocation();
   const navigate = useNavigate();
-  const view = new URLSearchParams(loc.search).get('view') || '';
 
   useEffect(() => { document.title = `${region} Railtel Project Management`; }, [region]);
   useEffect(() => { setMenu(false); }, [loc.pathname, loc.search]);
@@ -56,11 +46,7 @@ export default function App() {
           <SideLink to="/dashboard">Dashboard</SideLink>
           <div className="side-group">Projects</div>
           <NavLink to="/projects" className={({ isActive }) => (isActive ? 'side-link sub on' : 'side-link sub')}>All Projects</NavLink>          <div className="side-group">Stations</div>
-          <Link to="/stations" className={`side-link sub ${loc.pathname === '/stations' && view === '' ? 'on' : ''}`}>All Stations</Link>
-          {STATION_VIEWS.map((v) => (
-            <Link key={v.label} to={`/stations?view=${v.view}`}
-              className={`side-link sub ${loc.pathname === '/stations' && view === v.view ? 'on' : ''}`}>{v.label}</Link>
-          ))}
+          <Link to="/stations" className={`side-link sub ${loc.pathname === '/stations' ? 'on' : ''}`}>All Stations</Link>
           <SideLink to="/stations/new"><span className="sub-plus">+</span> Create New Station</SideLink>
         </aside>
         <main>

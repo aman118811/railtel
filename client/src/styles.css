@@ -761,7 +761,7 @@ table.stations { border-collapse: separate; border-spacing: 0; width: max-conten
 
 /* Full-width bars keep their background edge to edge, but their content starts at the container's edge. */
 :root { --edge: max(var(--gutter), calc((100% - var(--page-max)) / 2 + var(--gutter))); }
-.topbar { padding-inline: var(--edge); }
+.topbar { padding-inline: 16px; }
 .station-card { padding: 12px var(--edge); }
 .save-bar { padding-inline: var(--edge); }
 
