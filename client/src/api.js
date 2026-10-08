@@ -46,6 +46,15 @@ export const api = {
   page: (params = {}) => request('GET', `/stations?${query({ ...params, page: params.page || 1 })}`),
   dashboard: () => request('GET', `/dashboard?${query({})}`),
   facets: () => request('GET', `/facets?${query({})}`),
+  // Type-ahead for station names. Answers are remembered for the session, so typing back over a word costs nothing.
+  stationNames: (() => {
+    const seen = new Map();
+    return (q, region) => {
+      const key = `${region || ''}|${q.toLowerCase()}`;
+      if (seen.has(key)) return Promise.resolve(seen.get(key));
+      return request('GET', `/station-names?${query({ q, region })}`).then((rows) => { seen.set(key, rows); return rows; });
+    };
+  })(),
   lookups: (region) => request('GET', `/lookups?${query(region ? { region } : {})}`),
   exportUrl: (params = {}) => `${BASE}/export?${query(params)}`,
   // extra: { draft, lifecycle }

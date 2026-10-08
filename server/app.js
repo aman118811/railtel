@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import {
   pickKnown, applyComputed, validate, overallProgress, sameValue, deriveLifecycle, LIFECYCLE, FIELDS, REGIONS, DEFAULT_REGION,
 } from '../shared/fields.js';
+import { EXPORT_COLUMNS, EXPORT_TITLE } from '../shared/exportLayout.js';
 import {
   Station, StationHistory, Counter, Project, ProjectStation, ProjectHistory, PROJECT_STATUSES,
 } from './models/index.js';
@@ -251,19 +252,34 @@ export function createApp() {
     return res.json({ items: docs.map(map), total, page: pg, pageSize: size, pages });
   }));
 
-  // CSV of the current filter: one row per station, one column per form field (header carries the Excel column).
+  // CSV of the current filter, laid out exactly like the Excel sheet (title, three header rows, data from row 6, columns A..FD).
+  // Dates are written as dd.mm.yyyy like the sheet; the totals (P, AA, AO) are the app's calculated ones.
   app.get('/api/export', wrap(async (req, res) => {
     const exportFilter = filterFrom(req.query);
     if (req.query.project) await restrictToProject(exportFilter, req.query.project);
     const docs = await Station.find(exportFilter).sort({ sn: 1 }).lean();
-    const cols = FIELDS.filter((f) => !f.hidden || f.srcCol);
-    const head = ['S.N.', 'Lifecycle', 'Draft', ...cols.map((f) => `${f.label} [${f.srcCol || f.col}]`)];
-    const lines = [head.map(csvCell).join(',')];
+    const fieldAt = Object.fromEntries(FIELDS.filter((f) => /^[A-Z]+$/.test(f.col) && !f.hidden || f.key === 'commissioned').map((f) => [f.col, f]));
+    const blank = EXPORT_COLUMNS.map(() => '');
+    const lines = [
+      blank,
+      [EXPORT_TITLE, ...blank.slice(1)],
+      EXPORT_COLUMNS.map((c) => c.h3),
+      EXPORT_COLUMNS.map((c) => c.h4),
+      EXPORT_COLUMNS.map((c) => c.h5),
+    ];
+    const cell = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v.split('-').reverse().join('.') : v);
     for (const d of docs) {
-      lines.push([d.sn, d.lifecycle, d.draft ? 'Yes' : 'No', ...cols.map((f) => d.data?.[f.key])].map(csvCell).join(','));
+      const v = applyComputed(d.data || {});
+      const noPhase1 = v.has_phase1 !== 'Y'; // the sheet shows NA (or blank) there, not a calculated 0
+      lines.push(EXPORT_COLUMNS.map((c) => {
+        if (c.col === 'A') return d.sn;
+        if (c.col === 'AO' && noPhase1) return d.data?.src_p1_total ?? '';
+        return cell(fieldAt[c.col] ? v[fieldAt[c.col].key] : '');
+      }));
     }
-    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="nr-stations.csv"' });
-    res.send(`﻿${lines.join('\r\n')}`);
+    const name = `${String(req.query.region || 'stations').toLowerCase()}-stations.csv`;
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}"` });
+    res.send(`﻿${lines.map((row) => row.map(csvCell).join(',')).join('\r\n')}`);
   }));
 
   // Everything the dashboard shows. One database pass (aggregation); only small summaries are sent back.
@@ -461,6 +477,25 @@ export function createApp() {
     const d = (f) => Station.distinct(f, scope).then((a) => a.filter(Boolean).sort());
     const [zones, divisions, statuses, states] = await Promise.all([d('zone'), d('division'), d('status'), Station.distinct('data.state', scope).then((a) => a.filter(Boolean).sort())]);
     res.json({ regions: REGIONS, zones, divisions, statuses, lifecycles: LIFECYCLE, states });
+  }));
+
+  // Type-ahead for "Name of station": stations of the region whose name or code matches, best matches first, at most 10.
+  // Only a handful of small rows leave the database, so it stays fast however many stations there are.
+  app.get('/api/station-names', wrap(async (req, res) => {
+    const region = String(req.query.region || DEFAULT_REGION);
+    const q = String(req.query.q || '').trim().slice(0, 40);
+    const limit = Math.min(20, Math.max(1, Number(req.query.limit) || 10));
+    const filter = { region };
+    if (q) { const rx = new RegExp(escapeRegex(q), 'i'); filter.$or = [{ station_name: rx }, { stn_code: rx }]; }
+    const proj = { stn_code: 1, station_name: 1, zone: 1, division: 1, 'data.state': 1, 'data.server_thana': 1, 'data.server_thana_code': 1, 'data.old_category': 1 };
+    const docs = await Station.find(filter, proj).sort({ station_name: 1 }).limit(q ? 60 : limit).lean();
+    const lq = q.toLowerCase();
+    const rank = (d) => (d.station_name.toLowerCase().startsWith(lq) || d.stn_code.toLowerCase() === lq ? 0 : 1);
+    const rows = (q ? docs.sort((a, b) => rank(a) - rank(b)) : docs).slice(0, limit);
+    res.json(rows.map((d) => ({
+      code: d.stn_code, name: d.station_name, zone: d.zone, division: d.division ?? null, state: d.data?.state ?? null,
+      thana: d.data?.server_thana ?? null, thanaCode: d.data?.server_thana_code ?? null, cat: d.data?.old_category ?? null,
+    })));
   }));
 
   // Hints for the create-station form, learned from the region's existing stations: thanas (with their code,

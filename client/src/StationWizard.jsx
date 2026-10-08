@@ -11,8 +11,7 @@ import Field from './Field.jsx';
 import CompareSection from './CompareSection.jsx';
 import { fmtDate, lastListPath } from './format.js';
 
-const MASTER_NAMES = STATIONS_MASTER.map((m) => m.name);
-const MASTER_BY_NAME = Object.fromEntries(STATIONS_MASTER.map((m) => [m.name.toLowerCase(), m]));
+const STATION_OPTIONS = STATIONS_MASTER.map((m) => ({ value: m.name, label: m.name, search: `${m.name} ${m.code}`, hint: `${m.code} · ${m.division} · ${m.state}`, item: m }));
 const zoneOfDivision = (div) => Object.keys(ZONE_DIVISIONS).find((z) => ZONE_DIVISIONS[z].includes(div)) || null;
 const low = (v) => String(v ?? '').trim().toLowerCase();
 
@@ -150,14 +149,9 @@ export default function StationWizard() {
         if (isEmpty(d.state) && t.state) next.state = t.state;
       }
     }
-    if (key === 'station_name') {
-      const m = MASTER_BY_NAME[low(value)];
-      if (m && isEmpty(d.stn_code)) {
-        Object.assign(next, {
-          station_name: m.name, stn_code: m.code, zone: m.zone, division: m.division, state: m.state,
-          server_thana: m.thana, server_thana_code: m.thanaCode, ...(m.cat ? { old_category: m.cat } : {}),
-        });
-      }
+    if (key === 'stn_code' && value && isEmpty(d.station_name)) {
+      const m = lookupStation(value);
+      if (m) Object.assign(next, { station_name: m.name, zone: m.zone, division: m.division, state: m.state, server_thana: m.thana, server_thana_code: m.thanaCode, ...(m.cat ? { old_category: m.cat } : {}) });
     }
     return next;
   });
@@ -171,8 +165,22 @@ export default function StationWizard() {
     stepWarnings.stn_code = 'A station with code ' + view.stn_code + ' already exists in ' + view.zone + '.';
   }
   // Suggestions for the name and thana fields (the field definitions themselves are unchanged).
+  // Stations matching what is typed: the built-in directory (instant) plus the region's stations from the database.
+  const loadStationOptions = async (q) => {
+    const lq = q.toLowerCase();
+    let rows = [];
+    try { rows = await api.stationNames(q, stationRegion); } catch { /* fall back to the built-in directory */ }
+    const added = rows.map((r) => ({
+      value: r.name, label: r.name, search: `${r.name} ${r.code}`, badge: 'Added', hint: `${r.code} · ${r.division ?? '—'} · ${r.state ?? '—'}`, item: r,
+    }));
+    const have = new Set(added.map((o) => `${o.item.zone}:${o.item.code}`));
+    const fresh = STATION_OPTIONS.filter((o) => (!lq || o.search.toLowerCase().includes(lq)) && !have.has(`${o.item.zone}:${o.item.code}`));
+    return [...fresh, ...added].slice(0, 10);
+  };
   const withSuggestions = (f) => {
-    if (f.key === 'station_name') return { ...f, type: 'select', allowTyping: true, options: MASTER_NAMES };
+    if (f.key === 'station_name') {
+      return { ...f, type: 'combo', comboOptions: STATION_OPTIONS, loadOptions: loadStationOptions, onPick: applyMaster, placeholder: 'Search stations by name or code, or type a new name' };
+    }
     if (['server_thana', 'monitoring_thana'].includes(f.key) && thanaNames.length) return { ...f, type: 'select', allowTyping: true, options: thanaNames };
     return f;
   };
@@ -234,9 +242,8 @@ export default function StationWizard() {
     if (r) navigate(`/stations/${r.id}/view${projectId ? `?project=${projectId}` : ''}`, { replace: true });
   };
 
-  const masterMatch = step === 0 && !record && view.stn_code ? lookupStation(view.stn_code) : null;
   const applyMaster = (m) => setData((d) => ({
-    ...d, station_name: m.name, zone: m.zone, division: m.division, state: m.state, server_thana: m.thana, server_thana_code: m.thanaCode,
+    ...d, station_name: m.name, stn_code: m.code, zone: m.zone, division: m.division, state: m.state, server_thana: m.thana, server_thana_code: m.thanaCode,
     ...(m.cat ? { old_category: m.cat } : {}),
   }));
 
@@ -324,12 +331,6 @@ export default function StationWizard() {
 
       <section className="card step-card">
         <h2>{cur.title}</h2>
-        {masterMatch && (
-          <div className="form-lookup-banner">
-            <span>Found in the Railway Station Directory: <b>{masterMatch.name}</b> ({masterMatch.zone} · {masterMatch.division} · {masterMatch.state})</span>
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => applyMaster(masterMatch)}>Auto-fill station details</button>
-          </div>
-        )}
         {cur.id === 'scope' && pkg && scopeEmpty && (
           <div className="form-quick-banner">
             <button type="button" className="btn btn-sm btn-accent" onClick={() => Object.entries(pkg.values).forEach(([k, v]) => onChange(k, v))}>

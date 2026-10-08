@@ -216,3 +216,49 @@ test('projects: create, validate, link without duplicating, create-from-project,
   const lst = await call('GET', '/projects');
   assert.ok(lst.body.some((x) => x.name === 'Proj A' && x.stats.total === 1));
 });
+
+test('export: the CSV follows the Excel sheet layout (title, three header rows, 160 columns A..FD)', async () => {
+  const made = await call('POST', '/stations', { data: { ...station, stn_code: 'EXP1', station_name: 'Export Test', handover_date: '2026-03-04', scope_fixed: 9 } });
+  assert.equal(made.status, 201);
+  const text = await (await fetch(`${base}/export`)).text();
+  const parse = (src) => {
+    const rows = []; let row = []; let cur = ''; let q = false;
+    for (let i = 0; i < src.length; i += 1) {
+      const ch = src[i];
+      if (q) { if (ch === '"') { if (src[i + 1] === '"') { cur += '"'; i += 1; } else q = false; } else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === ',') { row.push(cur); cur = ''; }
+      else if (ch === '\n') { row.push(cur.replace(/\r$/, '')); rows.push(row); row = []; cur = ''; }
+      else cur += ch;
+    }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  };
+  const rows = parse(text.replace(/^\uFEFF/, ''));
+  assert.ok(rows.length >= 6);
+  assert.ok(rows.every((r) => r.length === 160), 'every row has exactly 160 cells');
+  assert.equal(rows[1][0], 'Status of CCTV System at Railway Stations (existing and ongoing/Planned works)');
+  assert.equal(rows[2][1], 'Stn CODE');                 // B, header row 3
+  assert.equal(rows[2][15], 'Scope of Work as per approved survey'); // P
+  assert.equal(rows[4][17], 'Fixed');                    // R, header row 5
+  assert.equal(rows[2][159 - 2], 'Bandwidth Details');   // FB
+  const mine = rows.slice(5).find((r) => r[1] === 'EXP1');
+  assert.ok(mine);
+  assert.equal(mine[2], 'Export Test');                  // C
+  assert.equal(mine[17], '9');                           // R scope fixed
+  assert.equal(mine[56], '04.03.2026');                  // BE handover date as dd.mm.yyyy
+});
+
+test('station-names: type-ahead by name or code, scoped to the region, at most the limit', async () => {
+  for (const [code, name] of [['TA1', 'Tamarind Road'], ['TA2', 'Tamil Halt'], ['TB1', 'Other Place']]) {
+    assert.equal((await call('POST', '/stations', { data: { ...station, stn_code: code, station_name: name } })).status, 201);
+  }
+  const byName = await call('GET', '/station-names?q=tam');
+  assert.deepEqual(byName.body.map((r) => r.code).sort(), ['TA1', 'TA2']);
+  assert.equal(byName.body[0].zone, station.zone);
+  const byCode = await call('GET', '/station-names?q=TB1');
+  assert.deepEqual(byCode.body.map((r) => r.name), ['Other Place']);
+  assert.equal((await call('GET', '/station-names?q=tam&limit=1')).body.length, 1);
+  assert.equal((await call('GET', '/station-names?q=tam&region=SR')).body.length, 0);
+  assert.ok((await call('GET', '/station-names')).body.length > 0); // empty query: first few names
+});
